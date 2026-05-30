@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Crochet Text Pattern Generator</title>
+<style>
+  :root {
+    --primary: #7c3aed;
+    --primary-dark: #6d28d9;
+    --surface: #faf5ff;
+    --card: #ffffff;
+    --border: #e2d9f3;
+    --text: #1e1b4b;
+    --muted: #6b7280;
+    --warn-bg: #fef3c7;
+    --warn-border: #f59e0b;
+    --warn-text: #92400e;
+    --radius: 14px;
+    --gap: 16px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--surface);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.45;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    padding: 22px 18px;
+    text-align: center;
+  }
+  header h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.3px; }
+  header p { margin: 6px 0 0; font-size: 14px; opacity: 0.92; }
+
+  main { max-width: 820px; margin: 0 auto; padding: var(--gap); }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--gap);
+    margin-bottom: var(--gap);
+  }
+
+  .card h2 {
+    margin: 0 0 4px;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .card .hint { margin: 0 0 14px; font-size: 13px; color: var(--muted); }
+
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .optional { color: var(--muted); font-weight: 400; }
+
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap);
+  }
+  .full { grid-column: 1 / -1; }
+
+  input, select {
+    width: 100%;
+    min-height: 48px;
+    font-size: 16px;
+    padding: 10px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--text);
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  input:focus, select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
+  }
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%237c3aed' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+  }
+
+  .color-row { display: flex; align-items: center; gap: 10px; }
+  input[type="color"] {
+    width: 52px;
+    min-width: 52px;
+    height: 48px;
+    padding: 4px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+
+  button {
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .generate-btn {
+    width: 100%;
+    min-height: 56px;
+    font-size: 19px;
+    font-weight: 800;
+    color: #fff;
+    background: var(--primary);
+    border: none;
+    border-radius: var(--radius);
+    margin-top: 4px;
+  }
+  .generate-btn:active { background: var(--primary-dark); }
+
+  .print-btn {
+    width: 100%;
+    min-height: 50px;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--primary);
+    background: #fff;
+    border: 2px solid var(--primary);
+    border-radius: 12px;
+    margin-top: 8px;
+  }
+  .print-btn:active { background: var(--surface); }
+
+  .warning {
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    color: var(--warn-text);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 14px;
+    margin-bottom: var(--gap);
+  }
+  .warning ul { margin: 6px 0 0; padding-left: 20px; }
+  .error {
+    background: #fee2e2;
+    border: 1px solid #ef4444;
+    color: #991b1b;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 14px;
+    margin-top: 10px;
+  }
+
+  #output { display: none; }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .stat {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .stat .num { font-size: 20px; font-weight: 800; color: var(--primary); }
+  .stat .lbl { font-size: 12px; color: var(--muted); }
+
+  .swatch {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border-radius: 3px;
+    border: 1px solid rgba(0,0,0,0.2);
+    vertical-align: -2px;
+    margin-right: 5px;
+  }
+
+  .canvas-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px;
+    background: #fff;
+    text-align: center;
+  }
+  canvas { display: inline-block; max-width: 100%; height: auto; image-rendering: pixelated; }
+
+  .instructions {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .instructions .row-line { padding: 2px 0; border-bottom: 1px dashed var(--border); }
+  .instructions .rownum { color: var(--primary); font-weight: 700; }
+
+  .materials li { margin-bottom: 4px; }
+
+  footer { text-align: center; font-size: 12px; color: var(--muted); padding: 0 16px 30px; }
+
+  @media (max-width: 480px) {
+    .summary-grid { grid-template-columns: 1fr; }
+  }
+
+  @media print {
+    header, .input-card, .generate-btn, .print-btn, footer { display: none !important; }
+    body { background: #fff; }
+    main { max-width: 100%; padding: 0; }
+    #output { display: block !important; }
+    .card { border: none; padding: 0 0 16px; margin: 0 0 16px; }
+    .canvas-wrap { border: 1px solid #999; }
+    canvas { max-width: 100%; }
+    .instructions { font-size: 11px; }
+    .row-line { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧶 Crochet Text Pattern Generator</h1>
+  <p>Turn any words into a graph crochet chart</p>
+</header>
+
+<main>
+  <div class="card input-card">
+    <h2>Make your pattern</h2>
+    <p class="hint">Only the text is required — everything else has good defaults. Tap Generate and tweak from there.</p>
+
+    <div class="grid2">
+      <div class="full">
+        <label for="text">Text to crochet</label>
+        <input id="text" type="text" placeholder="e.g. HELLO" autocomplete="off" autocapitalize="characters">
+      </div>
+
+      <div class="full">
+        <label for="yarn">Yarn weight <span class="optional">(optional)</span></label>
+        <select id="yarn">
+          <option value="Lace">Lace</option>
+          <option value="Fingering">Fingering</option>
+          <option value="Sport">Sport</option>
+          <option value="DK">DK</option>
+          <option value="Worsted" selected>Worsted (default)</option>
+          <option value="Bulky">Bulky</option>
+          <option value="Super Bulky">Super Bulky</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="hook">Hook size mm <span class="optional">(optional)</span></label>
+        <input id="hook" type="number" step="0.25" min="1" inputmode="decimal" placeholder="5.0">
+      </div>
+      <div>
+        <label for="gauge">Gauge: sts / 4in <span class="optional">(optional)</span></label>
+        <input id="gauge" type="number" step="1" min="4" inputmode="numeric" placeholder="18">
+      </div>
+
+      <div>
+        <label for="width">Width inches <span class="optional">(optional)</span></label>
+        <input id="width" type="number" step="0.5" min="1" inputmode="decimal" placeholder="auto">
+      </div>
+      <div>
+        <label for="height">Height inches <span class="optional">(optional)</span></label>
+        <input id="height" type="number" step="0.5" min="1" inputmode="decimal" placeholder="auto">
+      </div>
+
+      <div>
+        <label for="textColorName">Text color <span class="optional">(optional)</span></label>
+        <div class="color-row">
+          <input id="textColor" type="color" value="#000000" aria-label="Text color swatch">
+          <input id="textColorName" type="text" placeholder="Black" autocomplete="off">
+        </div>
+      </div>
+      <div>
+        <label for="bgColorName">Background color <span class="optional">(optional)</span></label>
+        <div class="color-row">
+          <input id="bgColor" type="color" value="#ffffff" aria-label="Background color swatch">
+          <input id="bgColorName" type="text" placeholder="White" autocomplete="off">
+        </div>
+      </div>
+    </div>
+
+    <button class="generate-btn" id="generateBtn" type="button">Generate Pattern</button>
+    <div id="inputError"></div>
+  </div>
+
+  <div id="output">
+    <div id="warnings"></div>
+
+    <div class="card">
+      <h2>Pattern summary</h2>
+      <div class="summary-grid" id="summary"></div>
+    </div>
+
+    <div class="card">
+      <h2>Chart</h2>
+      <p class="hint" id="chartNote"></p>
+      <div class="canvas-wrap">
+        <canvas id="patternCanvas"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Materials</h2>
+      <ul class="materials" id="materials"></ul>
+    </div>
+
+    <div class="card">
+      <h2>Row-by-row instructions</h2>
+      <p class="hint">Worked back &amp; forth. Row 1 is the bottom row. Odd rows read left→right, even rows right→left (turn at the end of each row).</p>
+      <div class="instructions" id="instructions"></div>
+    </div>
+
+    <button class="print-btn" id="printBtn" type="button">🖨️ Print / Save as PDF</button>
+  </div>
+</main>
+
+<footer>Made with love for crocheters · works offline, right in your browser</footer>
+
+<script>
+"use strict";
+
+/* ---------- 5x7 pixel font (MSB = leftmost of 5 columns) ---------- */
+const FONT = {
+  'A': [0b01110,0b10001,0b10001,0b11111,0b10001,0b10001,0b10001],
+  'B': [0b11110,0b10001,0b10001,0b11110,0b10001,0b10001,0b11110],
+  'C': [0b01110,0b10001,0b10000,0b10000,0b10000,0b10001,0b01110],
+  'D': [0b11100,0b10010,0b10001,0b10001,0b10001,0b10010,0b11100],
+  'E': [0b11111,0b10000,0b10000,0b11110,0b10000,0b10000,0b11111],
+  'F': [0b11111,0b10000,0b10000,0b11110,0b10000,0b10000,0b10000],
+  'G': [0b01110,0b10001,0b10000,0b10111,0b10001,0b10001,0b01111],
+  'H': [0b10001,0b10001,0b10001,0b11111,0b10001,0b10001,0b10001],
+  'I': [0b01110,0b00100,0b00100,0b00100,0b00100,0b00100,0b01110],
+  'J': [0b00111,0b00010,0b00010,0b00010,0b00010,0b10010,0b01100],
+  'K': [0b10001,0b10010,0b10100,0b11000,0b10100,0b10010,0b10001],
+  'L': [0b10000,0b10000,0b10000,0b10000,0b10000,0b10000,0b11111],
+  'M': [0b10001,0b11011,0b10101,0b10101,0b10001,0b10001,0b10001],
+  'N': [0b10001,0b11001,0b10101,0b10011,0b10001,0b10001,0b10001],
+  'O': [0b01110,0b10001,0b10001,0b10001,0b10001,0b10001,0b01110],
+  'P': [0b11110,0b10001,0b10001,0b11110,0b10000,0b10000,0b10000],
+  'Q': [0b01110,0b10001,0b10001,0b10001,0b10101,0b10010,0b01101],
+  'R': [0b11110,0b10001,0b10001,0b11110,0b10100,0b10010,0b10001],
+  'S': [0b01111,0b10000,0b10000,0b01110,0b00001,0b00001,0b11110],
+  'T': [0b11111,0b00100,0b00100,0b00100,0b00100,0b00100,0b00100],
+  'U': [0b10001,0b10001,0b10001,0b10001,0b10001,0b10001,0b01110],
+  'V': [0b10001,0b10001,0b10001,0b10001,0b10001,0b01010,0b00100],
+  'W': [0b10001,0b10001,0b10001,0b10101,0b10101,0b11011,0b10001],
+  'X': [0b10001,0b10001,0b01010,0b00100,0b01010,0b10001,0b10001],
+  'Y': [0b10001,0b10001,0b01010,0b00100,0b00100,0b00100,0b00100],
+  'Z': [0b11111,0b00001,0b00010,0b00100,0b01000,0b10000,0b11111],
+  '0': [0b01110,0b10001,0b10011,0b10101,0b11001,0b10001,0b01110],
+  '1': [0b00100,0b01100,0b00100,0b00100,0b00100,0b00100,0b01110],
+  '2': [0b01110,0b10001,0b00001,0b00110,0b01000,0b10000,0b11111],
+  '3': [0b11111,0b00010,0b00100,0b00010,0b00001,0b10001,0b01110],
+  '4': [0b00010,0b00110,0b01010,0b10010,0b11111,0b00010,0b00010],
+  '5': [0b11111,0b10000,0b11110,0b00001,0b00001,0b10001,0b01110],
+  '6': [0b00110,0b01000,0b10000,0b11110,0b10001,0b10001,0b01110],
+  '7': [0b11111,0b00001,0b00010,0b00100,0b01000,0b01000,0b01000],
+  '8': [0b01110,0b10001,0b10001,0b01110,0b10001,0b10001,0b01110],
+  '9': [0b01110,0b10001,0b10001,0b01111,0b00001,0b00010,0b01100],
+  '!': [0b00100,0b00100,0b00100,0b00100,0b00100,0b00000,0b00100],
+  '?': [0b01110,0b10001,0b00001,0b00110,0b00100,0b00000,0b00100],
+  '.': [0b00000,0b00000,0b00000,0b00000,0b00000,0b00000,0b00100],
+  ',': [0b00000,0b00000,0b00000,0b00000,0b00000,0b00100,0b01000],
+  "'": [0b00100,0b00100,0b01000,0b00000,0b00000,0b00000,0b00000],
+  '-': [0b00000,0b00000,0b00000,0b11111,0b00000,0b00000,0b00000],
+  ':': [0b00000,0b00100,0b00000,0b00000,0b00000,0b00100,0b00000],
+  ';': [0b00000,0b00100,0b00000,0b00000,0b00000,0b00100,0b01000],
+  '+': [0b00000,0b00100,0b00100,0b11111,0b00100,0b00100,0b00000],
+  '/': [0b00001,0b00010,0b00010,0b00100,0b01000,0b01000,0b10000],
+  '&': [0b01100,0b10010,0b10010,0b01100,0b10101,0b10010,0b01101],
+  '*': [0b00000,0b10101,0b01110,0b11111,0b01110,0b10101,0b00000],
+  '#': [0b01010,0b01010,0b11111,0b01010,0b11111,0b01010,0b01010],
+  '<': [0b00010,0b00100,0b01000,0b10000,0b01000,0b00100,0b00010],
+  '>': [0b01000,0b00100,0b00010,0b00001,0b00010,0b00100,0b01000],
+  '(': [0b00010,0b00100,0b01000,0b01000,0b01000,0b00100,0b00010],
+  ')': [0b01000,0b00100,0b00010,0b00010,0b00010,0b00100,0b01000],
+  '"': [0b01010,0b01010,0b01010,0b00000,0b00000,0b00000,0b00000],
+  '=': [0b00000,0b00000,0b11111,0b00000,0b11111,0b00000,0b00000]
+};
+
+const FONT_W = 5, FONT_H = 7;
+
+/* yarn weight -> default hook (mm), gauge (sts/4in), yards-per-stitch estimate */
+const YARN = {
+  'Lace':        { hook: 1.5,  gauge: 32, yps: 0.30 },
+  'Fingering':   { hook: 2.25, gauge: 28, yps: 0.40 },
+  'Sport':       { hook: 3.5,  gauge: 24, yps: 0.50 },
+  'DK':          { hook: 4.0,  gauge: 22, yps: 0.60 },
+  'Worsted':     { hook: 5.0,  gauge: 18, yps: 0.75 },
+  'Bulky':       { hook: 6.0,  gauge: 14, yps: 1.00 },
+  'Super Bulky': { hook: 8.0,  gauge: 10, yps: 1.40 }
+};
+
+/* ---------- element refs ---------- */
+const $ = (id) => document.getElementById(id);
+const els = {
+  text: $('text'), yarn: $('yarn'), hook: $('hook'), gauge: $('gauge'),
+  width: $('width'), height: $('height'),
+  textColor: $('textColor'), bgColor: $('bgColor'),
+  textColorName: $('textColorName'), bgColorName: $('bgColorName'),
+  generateBtn: $('generateBtn'), printBtn: $('printBtn'),
+  inputError: $('inputError'), output: $('output'), warnings: $('warnings'),
+  summary: $('summary'), canvas: $('patternCanvas'), chartNote: $('chartNote'),
+  materials: $('materials'), instructions: $('instructions')
+};
+
+/* Auto-fill hook & gauge placeholders when yarn weight changes (only if user
+   hasn't typed their own values, so we never clobber manual entries). */
+els.yarn.addEventListener('change', () => {
+  const y = YARN[els.yarn.value];
+  els.hook.placeholder = String(y.hook);
+  els.gauge.placeholder = String(y.gauge);
+});
+
+/* ---------- helpers ---------- */
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => (
+    { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]
+  ));
+}
+
+/* Build raw 7-row pixel grid from text. Returns {grid, skipped:[chars]} */
+function textToGrid(text) {
+  const upper = text.toUpperCase();
+  const columns = [];      // each entry is a 7-tall column array
+  const skipped = [];
+  let placedFirst = false;
+
+  for (const ch of upper) {
+    if (ch === ' ') {
+      // word gap: 3 empty columns
+      for (let i = 0; i < 3; i++) columns.push(new Array(FONT_H).fill(0));
+      placedFirst = true;
+      continue;
+    }
+    const glyph = FONT[ch];
+    if (!glyph) { if (ch.trim() !== '') skipped.push(ch); continue; }
+
+    // 1-column separator before this glyph (but not at the very start)
+    if (placedFirst) columns.push(new Array(FONT_H).fill(0));
+
+    for (let c = 0; c < FONT_W; c++) {
+      const col = [];
+      for (let r = 0; r < FONT_H; r++) {
+        col.push((glyph[r] >> (FONT_W - 1 - c)) & 1);
+      }
+      columns.push(col);
+    }
+    placedFirst = true;
+  }
+
+  // trim leading/trailing all-empty columns
+  const isEmpty = (col) => col.every(v => v === 0);
+  while (columns.length && isEmpty(columns[0])) columns.shift();
+  while (columns.length && isEmpty(columns[columns.length - 1])) columns.pop();
+
+  // transpose columns -> grid[row][col]
+  const cols = columns.length;
+  const grid = [];
+  for (let r = 0; r < FONT_H; r++) {
+    const row = [];
+    for (let c = 0; c < cols; c++) row.push(columns[c][r]);
+    grid.push(row);
+  }
+  return { grid, rawCols: cols, skipped };
+}
+
+/* Scale & center raw 7-row grid into a stitchRows x stitchCols grid */
+function buildStitchGrid(raw, rawCols, stitchCols, stitchRows, scale) {
+  const grid = [];
+  for (let r = 0; r < stitchRows; r++) grid.push(new Array(stitchCols).fill(0));
+
+  const scaledCols = rawCols * scale;
+  const scaledRows = FONT_H * scale;
+  const colOffset = Math.floor((stitchCols - scaledCols) / 2);
+  const rowOffset = Math.floor((stitchRows - scaledRows) / 2);
+
+  for (let r = 0; r < FONT_H; r++) {
+    for (let c = 0; c < rawCols; c++) {
+      if (!raw[r][c]) continue;
+      for (let sr = 0; sr < scale; sr++) {
+        for (let sc = 0; sc < scale; sc++) {
+          const gr = rowOffset + r * scale + sr;
+          const gc = colOffset + c * scale + sc;
+          if (gr >= 0 && gr < stitchRows && gc >= 0 && gc < stitchCols) {
+            grid[gr][gc] = 1;
+          }
+        }
+      }
+    }
+  }
+  return grid;
+}
+
+/* Run-length encode a row into [{v, n}] */
+function rle(rowArr) {
+  const runs = [];
+  for (const v of rowArr) {
+    const last = runs[runs.length - 1];
+    if (last && last.v === v) last.n++;
+    else runs.push({ v, n: 1 });
+  }
+  return runs;
+}
+
+/* ---------- main generate ---------- */
+function generate() {
+  els.inputError.innerHTML = '';
+  const text = els.text.value.trim();
+
+  if (!text) {
+    els.inputError.innerHTML = '<div class="error">Please enter some text to crochet.</div>';
+    els.output.style.display = 'none';
+    return;
+  }
+
+  const yarnKey = els.yarn.value;
+  const yarn = YARN[yarnKey];
+
+  // Optional numeric fields fall back to yarn-weight defaults
+  const hook = parseFloat(els.hook.value) || yarn.hook;
+  const gauge = parseFloat(els.gauge.value) || yarn.gauge;
+
+  // Color names default to picker-appropriate names
+  const textName = els.textColorName.value.trim() || 'Color A';
+  const bgName = els.bgColorName.value.trim() || 'Color B';
+  const textColor = els.textColor.value;
+  const bgColor = els.bgColor.value;
+
+  // Build raw grid
+  const { grid: raw, rawCols, skipped } = textToGrid(text);
+  if (rawCols === 0) {
+    els.inputError.innerHTML = '<div class="error">None of those characters are in the pattern font. Try letters A–Z, numbers, or basic punctuation.</div>';
+    els.output.style.display = 'none';
+    return;
+  }
+
+  const warnings = [];
+  if (skipped.length) {
+    const uniq = [...new Set(skipped)].map(escapeHtml).join(' ');
+    warnings.push('These characters aren\'t in the font and were skipped: ' + uniq);
+  }
+
+  const stitchesPerInch = gauge / 4;
+
+  // Width: use given width, else size so the text is at scale 1 with a small border
+  let stitchCols;
+  if (parseFloat(els.width.value) > 0) {
+    stitchCols = Math.max(1, Math.round(parseFloat(els.width.value) * stitchesPerInch));
+  } else {
+    stitchCols = rawCols + 4; // 2-stitch border each side at native size
+  }
+
+  // Height: use given height, else native font height + small border
+  let stitchRows;
+  if (parseFloat(els.height.value) > 0) {
+    stitchRows = Math.max(1, Math.round(parseFloat(els.height.value) * stitchesPerInch));
+  } else {
+    stitchRows = FONT_H + 4;
+  }
+
+  // Determine integer scale that fits both dimensions
+  let scale = Math.min(
+    Math.floor(stitchCols / rawCols),
+    Math.floor(stitchRows / FONT_H)
+  );
+  if (scale < 1) {
+    scale = 1;
+    warnings.push('Your text is larger than the chosen size at this gauge, so it may be cropped. Try a wider/taller product, a finer yarn, or shorter text.');
+  }
+
+  // Make sure the grid is at least big enough to hold the (scaled) text
+  const neededCols = rawCols * scale;
+  const neededRows = FONT_H * scale;
+  if (stitchCols < neededCols) stitchCols = neededCols;
+  if (stitchRows < neededRows) stitchRows = neededRows;
+
+  if (stitchCols < 8) warnings.push('This is a very narrow chart — the text may be hard to read.');
+
+  const grid = buildStitchGrid(raw, rawCols, stitchCols, stitchRows, scale);
+
+  // Stitch counts
+  let textStitches = 0;
+  for (const row of grid) for (const v of row) if (v) textStitches++;
+  const totalStitches = stitchRows * stitchCols;
+  const bgStitches = totalStitches - textStitches;
+
+  // Finished size
+  const widthIn = stitchCols / stitchesPerInch;
+  const heightIn = stitchRows / stitchesPerInch;
+
+  // Yardage estimate (+15% buffer)
+  const yardsOf = (n) => Math.ceil((n * yarn.yps / 36) * 1.15);
+  const textYds = yardsOf(textStitches);
+  const bgYds = yardsOf(bgStitches);
+
+  renderWarnings(warnings);
+  renderSummary({
+    stitchCols, stitchRows, totalStitches, textStitches, bgStitches,
+    widthIn, heightIn, textColor, bgColor, textName, bgName
+  });
+  renderCanvas(grid, stitchCols, stitchRows, textColor, bgColor, scale);
+  renderMaterials({ yarnKey, hook, gauge, textName, bgName, textYds, bgYds, scale });
+  renderInstructions(grid, stitchRows, textName, bgName);
+
+  els.output.style.display = 'block';
+  els.output.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderWarnings(warnings) {
+  if (!warnings.length) { els.warnings.innerHTML = ''; return; }
+  els.warnings.innerHTML =
+    '<div class="warning"><strong>Heads up:</strong><ul>' +
+    warnings.map(w => '<li>' + w + '</li>').join('') +
+    '</ul></div>';
+}
+
+function renderSummary(s) {
+  const fin = (n) => n.toFixed(1);
+  const cm = (n) => (n * 2.54).toFixed(1);
+  els.summary.innerHTML = `
+    <div class="stat"><div class="num">${s.stitchCols} × ${s.stitchRows}</div><div class="lbl">stitches wide × tall</div></div>
+    <div class="stat"><div class="num">${s.totalStitches.toLocaleString()}</div><div class="lbl">total stitches</div></div>
+    <div class="stat"><div class="num">${fin(s.widthIn)}" <span style="font-size:13px;color:var(--muted)">(${cm(s.widthIn)} cm)</span></div><div class="lbl">finished width</div></div>
+    <div class="stat"><div class="num">${fin(s.heightIn)}" <span style="font-size:13px;color:var(--muted)">(${cm(s.heightIn)} cm)</span></div><div class="lbl">finished height</div></div>
+    <div class="stat"><div class="num"><span class="swatch" style="background:${s.textColor}"></span>${s.textStitches.toLocaleString()}</div><div class="lbl">${escapeHtml(s.textName)} stitches</div></div>
+    <div class="stat"><div class="num"><span class="swatch" style="background:${s.bgColor}"></span>${s.bgStitches.toLocaleString()}</div><div class="lbl">${escapeHtml(s.bgName)} stitches</div></div>
+  `;
+}
+
+function renderCanvas(grid, cols, rows, textColor, bgColor, scale) {
+  const canvas = els.canvas;
+  const ctx = canvas.getContext('2d');
+
+  const labelGutter = 26; // space for row numbers on the left
+  const avail = Math.min((window.innerWidth || 360) - 60, 760);
+  let cell = Math.max(2, Math.floor(avail / cols));
+
+  // Safari canvas memory guard (~16.7M px)
+  while ((cell * cols + labelGutter) * (cell * rows + labelGutter) > 16000000 && cell > 1) {
+    cell--;
+  }
+
+  const showGrid = cell >= 4;
+  const showLabels = cell >= 9;
+  const gutterL = showLabels ? labelGutter : 0;
+  const gutterB = showLabels ? 16 : 0;
+
+  canvas.width = cols * cell + gutterL;
+  canvas.height = rows * cell + gutterB;
+
+  // background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // cells
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      ctx.fillStyle = grid[r][c] ? textColor : bgColor;
+      ctx.fillRect(gutterL + c * cell, r * cell, cell, cell);
+    }
+  }
+
+  // grid lines
+  if (showGrid) {
+    ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+    ctx.lineWidth = 1;
+    for (let c = 0; c <= cols; c++) {
+      const x = gutterL + c * cell + 0.5;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, rows * cell); ctx.stroke();
+    }
+    for (let r = 0; r <= rows; r++) {
+      const y = r * cell + 0.5;
+      ctx.beginPath(); ctx.moveTo(gutterL, y); ctx.lineTo(gutterL + cols * cell, y); ctx.stroke();
+    }
+    // bold every 5th line for easier counting
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+    ctx.lineWidth = 1.5;
+    for (let c = 0; c <= cols; c += 5) {
+      const x = gutterL + c * cell + 0.5;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, rows * cell); ctx.stroke();
+    }
+    for (let r = 0; r <= rows; r += 5) {
+      const y = r * cell + 0.5;
+      ctx.beginPath(); ctx.moveTo(gutterL, y); ctx.lineTo(gutterL + cols * cell, y); ctx.stroke();
+    }
+  }
+
+  // labels: row numbers (bottom = Row 1) and column ticks
+  if (showLabels) {
+    ctx.fillStyle = '#444';
+    ctx.font = Math.max(9, Math.min(cell - 2, 13)) + 'px -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let r = 0; r < rows; r++) {
+      const rowNum = rows - r; // bottom is Row 1
+      if (rowNum === 1 || rowNum === rows || rowNum % 5 === 0) {
+        ctx.fillText(String(rowNum), gutterL - 4, r * cell + cell / 2);
+      }
+    }
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for (let c = 0; c < cols; c += 5) {
+      ctx.fillText(String(c + 1), gutterL + c * cell + cell / 2, rows * cell + 2);
+    }
+  }
+
+  // responsive display width
+  canvas.style.width = Math.min(canvas.width, avail + labelGutter) + 'px';
+
+  els.chartNote.textContent = scale > 1
+    ? `Each pixel of the letters = ${scale}×${scale} stitches. Bold lines every 5 stitches help you count.`
+    : 'Each square = one stitch. Bold lines every 5 stitches help you count.';
+}
+
+function renderMaterials(m) {
+  els.materials.innerHTML = `
+    <li><strong>Yarn weight:</strong> ${escapeHtml(m.yarnKey)}</li>
+    <li><strong>Hook:</strong> ${m.hook} mm</li>
+    <li><strong>Gauge:</strong> ${m.gauge} stitches per 4 inches</li>
+    <li><strong>${escapeHtml(m.textName)} yarn:</strong> ~${m.textYds} yards (${Math.ceil(m.textYds * 0.9144)} m)</li>
+    <li><strong>${escapeHtml(m.bgName)} yarn:</strong> ~${m.bgYds} yards (${Math.ceil(m.bgYds * 0.9144)} m)</li>
+    <li><strong>Technique:</strong> Single crochet (sc) in graph / tapestry style, carrying the unused color across the back.</li>
+    <li style="color:var(--muted);font-size:13px">Yardage is a rough estimate — buy a little extra to be safe.</li>
+  `;
+}
+
+function renderInstructions(grid, rows, textName, bgName) {
+  const lines = [];
+  // grid[0] is the TOP visual row; Row 1 of crochet is the BOTTOM, so iterate bottom-up
+  for (let i = 0; i < rows; i++) {
+    const rowNum = i + 1;
+    const visualRow = rows - 1 - i; // bottom row first
+    let rowArr = grid[visualRow].slice();
+
+    // even rows are worked right-to-left
+    if (rowNum % 2 === 0) rowArr = rowArr.reverse();
+
+    const runs = rle(rowArr);
+    const parts = runs.map(r => `${r.n} ${escapeHtml(r.v ? textName : bgName)}`);
+    const dir = rowNum % 2 === 1 ? '→' : '←';
+    lines.push(
+      `<div class="row-line"><span class="rownum">Row ${rowNum} ${dir}:</span> ${parts.join(', ')} <span style="color:var(--muted)">(${rowArr.length} sc)</span></div>`
+    );
+  }
+  els.instructions.innerHTML = lines.join('');
+}
+
+/* ---------- wire up ---------- */
+els.generateBtn.addEventListener('click', generate);
+els.text.addEventListener('keydown', (e) => { if (e.key === 'Enter') generate(); });
+els.printBtn.addEventListener('click', () => window.print());
+
+// re-render the canvas on rotation/resize if a pattern is showing
+let resizeTimer;
+window.addEventListener('resize', () => {
+  if (els.output.style.display !== 'block') return;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(generate, 200);
+});
+</script>
+</body>
+</html>
