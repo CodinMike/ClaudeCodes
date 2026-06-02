@@ -278,13 +278,11 @@ async function getXml(url) {
 }
 
 /* ── sources ───────────────────────────────────────────────────── */
-let _tsId = null;
+// Hardcoded so we skip the lookup request entirely — one fewer CORS call.
+// This ID is Trump's permanent Truth Social account ID; it never changes.
+let _tsId = '107780257626128497';
 
 async function fromTruthSocial() {
-  if (!_tsId) {
-    const d = await getJson(`${TS_BASE}/accounts/lookup?acct=${HANDLE}`);
-    _tsId = d.id;
-  }
   const posts = await getJson(`${TS_BASE}/accounts/${_tsId}/statuses?limit=40&exclude_replies=true`);
   return { posts, label: 'Truth Social' };
 }
@@ -390,13 +388,18 @@ async function load() {
   }
 
   if (!raw) {
+    const fromFile = location.protocol === 'file:';
     document.getElementById('feed').innerHTML = `<div class="errmsg">
       Could not load posts.<br><br>
-      ${errors.map(e=>`<small>${esc(e)}</small>`).join('<br>')}
-      <br><br>
-      Tip: CORS blocks browser fetches from <code>file://</code>.<br>
-      Serve locally: <code>python -m http.server 8080</code>
-      then open <code>http://localhost:8080/trump_tweets.html</code>
+      ${fromFile
+        ? `<b>Chrome blocks API calls from local files.</b><br>
+           Open this URL in Chrome on your phone instead:<br><br>
+           <code style="font-size:13px;word-break:break-all">
+             https://codinmike.github.io/ClaudeCodes/trump_tweets.html
+           </code><br><br>
+           (Enable GitHub Pages in your repo Settings first — one click.)`
+        : errors.map(e=>`<small>${esc(e)}</small>`).join('<br>')
+      }
     </div>`;
     return;
   }
