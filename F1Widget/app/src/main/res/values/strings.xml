@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">F1 Next Session</string>
+    <string name="widget_description">Shows the date and time of the next F1 session in Eastern Time</string>
+</resources>

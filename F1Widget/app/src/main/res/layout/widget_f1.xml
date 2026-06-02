@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    4×1 F1 Next Session Widget
+    Layout: [F1 | Race Name / Session Type | Date / Time ET]
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:background="@drawable/widget_background"
+    android:gravity="center_vertical"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp">
+
+    <!-- F1 badge -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <TextView
+            android:id="@+id/tv_f1_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="F1"
+            android:textColor="#E10600"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.05"
+            android:fontFamily="sans-serif-black" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="NEXT"
+            android:textColor="#99FFFFFF"
+            android:textSize="7sp"
+            android:letterSpacing="0.15"
+            android:fontFamily="sans-serif-condensed" />
+
+    </LinearLayout>
+
+    <!-- Divider -->
+    <View
+        android:layout_width="1dp"
+        android:layout_height="28dp"
+        android:background="@drawable/divider_vertical"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp" />
+
+    <!-- Race name + session type -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tv_race_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Loading…"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-condensed"
+            android:letterSpacing="0.02"
+            android:singleLine="true"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/tv_session_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="#D4A96A"
+            android:textSize="9sp"
+            android:fontFamily="sans-serif-condensed"
+            android:letterSpacing="0.12"
+            android:singleLine="true" />
+
+    </LinearLayout>
+
+    <!-- Divider -->
+    <View
+        android:layout_width="1dp"
+        android:layout_height="28dp"
+        android:background="@drawable/divider_vertical"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp" />
+
+    <!-- Date + time -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="end|center_vertical">
+
+        <TextView
+            android:id="@+id/tv_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="---"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-condensed"
+            android:letterSpacing="0.04"
+            android:singleLine="true" />
+
+        <TextView
+            android:id="@+id/tv_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="--:-- ET"
+            android:textColor="#D4A96A"
+            android:textSize="11sp"
+            android:fontFamily="sans-serif-condensed"
+            android:letterSpacing="0.04"
+            android:singleLine="true" />
+
+    </LinearLayout>
+
+</LinearLayout>

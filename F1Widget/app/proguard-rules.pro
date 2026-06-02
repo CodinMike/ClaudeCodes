@@ -1,0 +1,2 @@
+-keep class com.f1widget.** { *; }
+-keepattributes *Annotation*
