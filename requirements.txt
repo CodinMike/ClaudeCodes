@@ -1,0 +1,6 @@
+requests>=2.28
+rich>=13.0
+click>=8.1
+beautifulsoup4>=4.12
+# Optional: for --speak (Trump TTS via ElevenLabs)
+# elevenlabs>=1.0
