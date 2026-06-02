@@ -1,16 +1,33 @@
 <!DOCTYPE html>
 <!--
-  TrumpTweets — open in any browser
-  Best served locally to avoid CORS blocks:
-    python -m http.server 8080
-    → http://localhost:8080/trump_tweets.html
-  Firefox also works by opening the file directly (file://).
+  TrumpTweets — installable PWA for Chrome on Android / any browser
+
+  To install on your S24 Ultra:
+    1. Open this URL in Chrome on your phone
+    2. Tap the ⋮ menu → "Add to Home screen"
+    It'll install as a standalone app with no browser chrome.
+
+  Hosting options (the page must be on HTTPS for full PWA install):
+    • GitHub Pages  — merge branch to main, enable Pages in repo Settings
+    • python -m http.server 8080  (local WiFi only)
+
+  Proton VPN note: keep VPN OFF when loading posts — Truth Social and
+  some Nitter instances block known VPN exit IPs. The CORS proxies used
+  as fallbacks (corsproxy.io, allorigins.win) also come from fixed IPs,
+  so if those fail, Twitter/Nitter via direct fetch is the best bet.
 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0d1117">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TrumpTweets">
+<!-- Inline PWA manifest — lets Chrome offer "Add to Home Screen" -->
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22TrumpTweets%22%2C%22short_name%22%3A%22TrumpTweets%22%2C%22description%22%3A%22Clean+filtered+Trump+feed%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230d1117%22%2C%22theme_color%22%3A%22%230d1117%22%2C%22orientation%22%3A%22portrait%22%7D">
 <title>TrumpTweets</title>
 <style>
   :root {
@@ -72,12 +89,14 @@
     overflow-x: auto; -webkit-overflow-scrolling: touch;
   }
   .src-btn {
-    padding: 5px 16px; border-radius: 20px;
+    padding: 6px 16px; border-radius: 20px;
+    min-height: 36px;   /* touch-friendly tap target */
     border: 1px solid var(--border);
     background: transparent; color: var(--muted);
-    cursor: pointer; font-size: 13px; font-family: inherit;
+    cursor: pointer; font-size: 14px; font-family: inherit;
     white-space: nowrap;
     transition: color .15s, border-color .15s, background .15s;
+    -webkit-tap-highlight-color: transparent;
     user-select: none;
   }
   .src-btn:hover { border-color: var(--blue); color: var(--blue); }
@@ -115,7 +134,7 @@
   .badge.twitter { background: var(--twitter-bg); color: var(--twitter-fg); }
 
   .card-body {
-    font-size: 15px; line-height: 1.7;
+    font-size: 16px; line-height: 1.7; /* 16px prevents iOS auto-zoom on tap */
     color: var(--text);
     white-space: pre-wrap; word-break: break-word;
   }
