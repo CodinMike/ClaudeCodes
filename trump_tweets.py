@@ -1,24 +1,28 @@
 #!/usr/bin/env python3
 """
-truth_feed.py — Clean Trump Truth Social feed.
+TrumpTweets — Clean feed of Trump's posts from multiple sources.
 No reposts, endorsements, or staff-written posts. Just the man himself.
 
-Usage:
-    python truth_feed.py
-    python truth_feed.py --limit 10
-    python truth_feed.py --watch
-    python truth_feed.py --speak --elevenlabs-key YOUR_KEY
+Sources (tried in order unless --source is specified):
+  truthsocial  — Truth Social API  (may block cloud/VPS IPs)
+  twitter      — Nitter RSS mirrors of his Twitter/X feed
 
-Note: Truth Social blocks requests from cloud/VPS IPs.
-Run this on your local machine with a residential connection.
+Usage:
+    python trump_tweets.py
+    python trump_tweets.py --limit 10
+    python trump_tweets.py --watch
+    python trump_tweets.py --source twitter
+    python trump_tweets.py --speak --elevenlabs-key YOUR_KEY
 """
 
 import os
 import re
 import time
+import xml.etree.ElementTree as ET
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
+from email.utils import parsedate_to_datetime
 
 import click
 import requests
@@ -36,17 +40,28 @@ try:
 except ImportError:
     HAS_ELEVENLABS = False
 
-BASE_URL = "https://truthsocial.com/api/v1"
-ACCOUNT_HANDLE = "realDonaldTrump"
-POLL_INTERVAL = 60
+# ── Config ────────────────────────────────────────────────────────────────────
 
-# ElevenLabs Trump voice — find IDs at https://elevenlabs.io/voice-library (search "Trump")
-# Override with: export TRUMP_VOICE_ID=your_voice_id
+TWITTER_HANDLE = "realDonaldTrump"
+POLL_INTERVAL = 60
 TRUMP_VOICE_ID_DEFAULT = os.environ.get("TRUMP_VOICE_ID", "TxGEqnHWrfWFTfGW9XjX")
+
+TRUTH_SOCIAL_BASE = "https://truthsocial.com/api/v1"
+
+# Nitter is an open-source Twitter frontend that exposes RSS with no auth needed.
+# Trump is back on Twitter (@realDonaldTrump), so Nitter gives us his tweets.
+NITTER_INSTANCES = [
+    "nitter.net",
+    "nitter.privacydev.net",
+    "nitter.poast.org",
+    "nitter.1d4.us",
+    "nitter.unixfox.eu",
+    "nitter.woodland.cafe",
+]
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0",
-    "Accept": "application/json",
+    "Accept": "application/json, application/rss+xml, text/xml, */*",
 }
 
 STOPWORDS = {
@@ -65,6 +80,7 @@ _cached_account_id: str | None = None
 
 @dataclass
 class SessionStats:
+    source: str = ""
     fetched: int = 0
     displayed: int = 0
     filtered_repost: int = 0
@@ -80,34 +96,28 @@ class SessionStats:
 
 # ── HTTP ──────────────────────────────────────────────────────────────────────
 
-def _get(url: str, params: dict | None = None) -> dict | list:
+def _get(url: str, params: dict | None = None, accept_xml: bool = False) -> requests.Response:
+    headers = dict(HEADERS)
+    if accept_xml:
+        headers["Accept"] = "application/rss+xml, text/xml, */*"
     try:
-        resp = requests.get(url, params=params, headers=HEADERS, timeout=10)
-    except requests.exceptions.ConnectionError:
-        raise RuntimeError(
-            "Could not connect to Truth Social — check your network.\n"
-            "  Tip: Truth Social blocks cloud/VPS IPs. Run this on your local machine."
-        )
+        resp = requests.get(url, params=params, headers=headers, timeout=8)
+    except requests.exceptions.ConnectionError as e:
+        raise RuntimeError(f"Connection failed: {url}") from e
     except requests.exceptions.Timeout:
-        raise RuntimeError("Truth Social request timed out after 10s.")
+        raise RuntimeError(f"Timed out: {url}")
 
     if resp.status_code == 429:
         time.sleep(30)
-        resp = requests.get(url, params=params, headers=HEADERS, timeout=10)
+        resp = requests.get(url, params=params, headers=headers, timeout=8)
 
     if resp.status_code == 403:
         reason = resp.headers.get("x-deny-reason", "")
-        raise RuntimeError(
-            f"Truth Social blocked the request (403 {reason}).\n"
-            "  Truth Social only allows residential IPs to access its API.\n"
-            "  Run this script on your local machine, not a cloud server."
-        )
-    if resp.status_code == 404:
-        raise RuntimeError(f"Resource not found: {url}")
+        raise RuntimeError(f"Blocked (403 {reason}): {url}")
     if resp.status_code >= 400:
-        raise RuntimeError(f"Truth Social API returned HTTP {resp.status_code}")
+        raise RuntimeError(f"HTTP {resp.status_code}: {url}")
 
-    return resp.json()
+    return resp
 
 
 # ── Text utilities ────────────────────────────────────────────────────────────
@@ -133,27 +143,109 @@ def format_timestamp(iso_str: str) -> str:
     return dt.astimezone().strftime("%a %b %d  %I:%M %p").replace("  0", "  ")
 
 
-# ── API ───────────────────────────────────────────────────────────────────────
+# ── Source: Truth Social ──────────────────────────────────────────────────────
 
-def resolve_account_id(handle: str) -> str:
+def _resolve_ts_account_id() -> str:
     global _cached_account_id
-    if _cached_account_id is not None:
+    if _cached_account_id:
         return _cached_account_id
-    data = _get(f"{BASE_URL}/accounts/lookup", {"acct": handle})
+    resp = _get(f"{TRUTH_SOCIAL_BASE}/accounts/lookup", {"acct": TWITTER_HANDLE})
+    data = resp.json()
     if not isinstance(data, dict) or "id" not in data:
-        raise RuntimeError(f"Could not resolve account @{handle}")
+        raise RuntimeError("Could not resolve Truth Social account")
     _cached_account_id = data["id"]
     return _cached_account_id
 
 
-def fetch_posts(account_id: str) -> list[dict]:
-    data = _get(
-        f"{BASE_URL}/accounts/{account_id}/statuses",
+def fetch_truth_social() -> tuple[list[dict], str]:
+    account_id = _resolve_ts_account_id()
+    resp = _get(
+        f"{TRUTH_SOCIAL_BASE}/accounts/{account_id}/statuses",
         {"limit": 40, "exclude_replies": "true"},
     )
-    if not isinstance(data, list):
-        raise RuntimeError("Unexpected response format from Truth Social API")
-    return data
+    posts = resp.json()
+    if not isinstance(posts, list):
+        raise RuntimeError("Unexpected Truth Social response format")
+    return posts, "Truth Social"
+
+
+# ── Source: Nitter (Twitter/X RSS) ───────────────────────────────────────────
+
+def _parse_rss_items(xml_text: str, instance: str) -> list[dict]:
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError as e:
+        raise RuntimeError(f"Invalid RSS from {instance}: {e}") from e
+
+    channel = root.find("channel")
+    if channel is None:
+        raise RuntimeError(f"No <channel> in RSS from {instance}")
+
+    posts: list[dict] = []
+    for item in channel.findall("item"):
+        desc = item.findtext("description") or ""
+        pub_date = item.findtext("pubDate") or ""
+        link = item.findtext("link") or ""
+        guid = item.findtext("guid") or link
+
+        try:
+            created_at = parsedate_to_datetime(pub_date).isoformat()
+        except Exception:
+            created_at = ""
+
+        post_id = guid.split("/")[-1].replace("#m", "") or guid
+        text = strip_html(desc)
+        is_rt = text.strip().startswith("RT @")
+
+        posts.append({
+            "id": f"tw_{post_id}",
+            "content": desc,
+            "created_at": created_at,
+            "url": link,
+            "favourites_count": 0,
+            "reblogs_count": 0,
+            "reblog": {"_rt": True} if is_rt else None,
+            "_source": "twitter",
+        })
+
+    return posts
+
+
+def fetch_nitter() -> tuple[list[dict], str]:
+    last_err = "No Nitter instances available"
+    for instance in NITTER_INSTANCES:
+        url = f"https://{instance}/{TWITTER_HANDLE}/rss"
+        try:
+            resp = _get(url, accept_xml=True)
+            posts = _parse_rss_items(resp.text, instance)
+            if posts:
+                return posts, f"Twitter via {instance}"
+        except RuntimeError as e:
+            last_err = str(e)
+            continue
+    raise RuntimeError(f"All Nitter instances failed. Last error: {last_err}")
+
+
+# ── Source dispatcher ─────────────────────────────────────────────────────────
+
+def get_posts(source: str, console: Console) -> tuple[list[dict], str]:
+    sources = {
+        "truthsocial": [fetch_truth_social],
+        "twitter": [fetch_nitter],
+        "auto": [fetch_truth_social, fetch_nitter],
+    }
+    fetchers = sources.get(source, sources["auto"])
+    errors: list[str] = []
+
+    for fetcher in fetchers:
+        try:
+            return fetcher()
+        except RuntimeError as e:
+            errors.append(str(e))
+            if len(fetchers) > 1:
+                console.print(f"[color(240)]  ↳ {fetcher.__name__} failed, trying next source...[/color(240)]")
+
+    raise RuntimeError("All sources failed:\n  " + "\n  ".join(errors))
 
 
 # ── Filtering ─────────────────────────────────────────────────────────────────
@@ -191,7 +283,7 @@ def filter_reason(post: dict, text: str) -> str | None:
     return None
 
 
-# ── Stats collection ──────────────────────────────────────────────────────────
+# ── Stats ─────────────────────────────────────────────────────────────────────
 
 def collect_stats(text: str, stats: SessionStats) -> None:
     stats.displayed += 1
@@ -214,16 +306,22 @@ def render_post(post: dict, console: Console, speak_fn=None) -> None:
     url = post.get("url", "")
     faves = post.get("favourites_count", 0)
     reblogs = post.get("reblogs_count", 0)
+    src = post.get("_source", "")
 
     body = Text()
-    body.append(f"{ts}\n\n", style="color(244)")
+    body.append(ts, style="color(244)")
+    if src == "twitter":
+        body.append("  ·  𝕏 twitter", style="color(240)")
+    body.append("\n\n")
     body.append(text, style="bright_white")
     body.append("\n\n")
-    body.append(f"❤  {faves:,}", style="bold red")
-    body.append("   ")
-    body.append(f"🔁 {reblogs:,}", style="bold green")
-    if url:
+    if faves:
+        body.append(f"❤  {faves:,}", style="bold red")
         body.append("   ")
+    if reblogs:
+        body.append(f"🔁 {reblogs:,}", style="bold green")
+        body.append("   ")
+    if url:
         body.append(url, style=f"dim link {url}")
 
     console.print(
@@ -246,13 +344,10 @@ def render_stats(stats: SessionStats, console: Console) -> None:
         else "classic Trump" if caps_pct >= 10
         else "unusually calm"
     )
-
     exclaim_ratio = (
         f"{stats.exclamations / stats.questions:.1f}x more than questions"
-        if stats.questions
-        else "no questions, only statements"
+        if stats.questions else "no questions, only statements"
     )
-
     top_words = [w for w, _ in stats.word_counts.most_common(8)]
 
     console.print(Rule(style="color(240)"))
@@ -261,6 +356,9 @@ def render_stats(stats: SessionStats, console: Console) -> None:
     table.add_column(style="color(244)", no_wrap=True)
     table.add_column(style="bright_white")
 
+    if stats.source:
+        table.add_row("Source", f"[bold]{stats.source}[/bold]")
+        table.add_row("", "")
     table.add_row("Posts fetched", str(stats.fetched))
     table.add_row("Posts shown", f"[bold green]{stats.displayed}[/bold green]")
     table.add_row(
@@ -321,22 +419,23 @@ def make_speak_fn(api_key: str, voice_id: str):
             )
             _el_play(audio)
         except Exception:
-            pass  # TTS errors shouldn't crash the feed
+            pass
 
     return speak
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# ── Core loop ─────────────────────────────────────────────────────────────────
 
 def run_once(
+    source: str,
     limit: int,
     console: Console,
     seen_ids: set,
     stats: SessionStats,
     speak_fn=None,
 ) -> set:
-    account_id = resolve_account_id(ACCOUNT_HANDLE)
-    posts = fetch_posts(account_id)
+    posts, source_label = get_posts(source, console)
+    stats.source = source_label
 
     new_seen = set(seen_ids)
     displayed_this_run = 0
@@ -353,17 +452,14 @@ def run_once(
         text = strip_html(post.get("content", ""))
         reason = filter_reason(post, text)
 
+        stats.fetched += 1
         if reason == "repost":
             stats.filtered_repost += 1
-            stats.fetched += 1
         elif reason == "staff":
             stats.filtered_staff += 1
-            stats.fetched += 1
         elif reason == "endorsement":
             stats.filtered_endorsement += 1
-            stats.fetched += 1
         else:
-            stats.fetched += 1
             collect_stats(text, stats)
             render_post(post, console, speak_fn)
             displayed_this_run += 1
@@ -374,15 +470,24 @@ def run_once(
     return new_seen
 
 
+# ── CLI ───────────────────────────────────────────────────────────────────────
+
 @click.command()
 @click.option("--limit", default=20, show_default=True, help="Max posts to show per run.")
 @click.option("--watch", is_flag=True, help=f"Poll every {POLL_INTERVAL}s for new posts.")
+@click.option(
+    "--source",
+    type=click.Choice(["auto", "truthsocial", "twitter"], case_sensitive=False),
+    default="auto",
+    show_default=True,
+    help="Post source. 'auto' tries Truth Social then Twitter/Nitter.",
+)
 @click.option("--speak", is_flag=True, help="Read posts aloud in Trump's voice (requires ElevenLabs).")
 @click.option(
     "--elevenlabs-key",
     envvar="ELEVENLABS_API_KEY",
     default=None,
-    help="ElevenLabs API key (or set ELEVENLABS_API_KEY env var). Get one at https://elevenlabs.io",
+    help="ElevenLabs API key (or set ELEVENLABS_API_KEY). Get one at https://elevenlabs.io",
 )
 @click.option(
     "--voice-id",
@@ -390,10 +495,18 @@ def run_once(
     show_default=True,
     help="ElevenLabs voice ID. Find Trump voices at https://elevenlabs.io/voice-library",
 )
-def main(limit: int, watch: bool, speak: bool, elevenlabs_key: str | None, voice_id: str) -> None:
-    """Clean Trump Truth Social feed — no ads, reposts, or endorsements."""
+def main(
+    limit: int,
+    watch: bool,
+    source: str,
+    speak: bool,
+    elevenlabs_key: str | None,
+    voice_id: str,
+) -> None:
+    """TrumpTweets — clean filtered feed from Truth Social and Twitter."""
     console = Console()
     stats = SessionStats()
+    source = source.lower()
 
     speak_fn = None
     if speak:
@@ -407,10 +520,12 @@ def main(limit: int, watch: bool, speak: bool, elevenlabs_key: str | None, voice
     console.print(
         Panel(
             Text.assemble(
-                ("@", "color(244)"),
-                (ACCOUNT_HANDLE, "bold bright_white"),
+                ("TrumpTweets", "bold bright_white"),
                 ("  ·  ", "color(240)"),
-                ("Truth Social  ·  filtered feed", "color(244)"),
+                ("@", "color(244)"),
+                (TWITTER_HANDLE, "color(244)"),
+                ("  ·  ", "color(240)"),
+                ("filtered feed", "color(244)"),
             ),
             border_style="color(24)",
             padding=(0, 2),
@@ -423,12 +538,12 @@ def main(limit: int, watch: bool, speak: bool, elevenlabs_key: str | None, voice
 
     try:
         seen_ids: set = set()
-        seen_ids = run_once(limit, console, seen_ids, stats, speak_fn)
+        seen_ids = run_once(source, limit, console, seen_ids, stats, speak_fn)
 
         if watch:
             while True:
                 time.sleep(POLL_INTERVAL)
-                seen_ids = run_once(limit, console, seen_ids, stats, speak_fn)
+                seen_ids = run_once(source, limit, console, seen_ids, stats, speak_fn)
 
     except RuntimeError as e:
         console.print(f"\n[bold red]Error:[/bold red] {e}")
